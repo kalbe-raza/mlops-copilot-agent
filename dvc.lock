@@ -43,8 +43,8 @@ stages:
       size: 93563
     - path: training/train.py
       hash: md5
-      md5: cccfdde5f98f6d1cf1698722e60e5f66
-      size: 19443
+      md5: a19b513a2f58360c9d523c2305b3119d
+      size: 20246
     params:
       params.yaml:
         train.model_type: random_forest

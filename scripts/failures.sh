@@ -12,7 +12,7 @@ case "${1:-}" in
     .venv/bin/python scripts/make_dataset.py --version corrupt
     .venv/bin/dvc status data/raw/dataset.csv.dvc || true ;;
   resolve-data)
-    .venv/bin/dvc checkout data/raw/dataset.csv
+    .venv/bin/dvc checkout --force data/raw/dataset.csv   # --force: overwrite the modified workspace copy
     .venv/bin/dvc status ;;
   inject-k8s)
     kubectl -n mlops-agent patch configmap inference-api-config --type merge \
