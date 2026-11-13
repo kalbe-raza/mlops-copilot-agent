@@ -165,7 +165,19 @@ def preprocess(workdir: Path, test_size: float = 0.25) -> dict[str, Any]:
 
 
 # --------------------------------------------------------------------------- stage: train
+# Sensible per-model defaults; explicit params override them (so a DAG run that only sets model_type
+# never receives hyper-parameters meant for a different estimator).
+DEFAULT_PARAMS: dict[str, dict[str, Any]] = {
+    "logistic_regression": {"C": 1.0},
+    "random_forest": {"n_estimators": 300, "max_depth": 8},
+    "gradient_boosting": {"n_estimators": 200, "learning_rate": 0.05, "max_depth": 2},
+    "svm": {"C": 3.0},
+    "decision_stump": {},
+}
+
+
 def build_model(model_type: str, params: dict[str, Any]) -> Pipeline:
+    params = {**DEFAULT_PARAMS.get(model_type, {}), **params}
     if model_type == "logistic_regression":
         est = LogisticRegression(max_iter=5000, random_state=RANDOM_STATE, **params)
     elif model_type == "random_forest":
@@ -186,6 +198,7 @@ def train(workdir: Path, model_type: str, params: dict[str, Any]) -> dict[str, A
     _require(state, "preprocess", "train")
     train_df = pd.read_csv(workdir / "train.csv")
     x, y = train_df[schema.FEATURE_COLUMNS], train_df[schema.TARGET_COLUMN]
+    params = {**DEFAULT_PARAMS.get(model_type, {}), **params}
     model = build_model(model_type, params)
     started = time.perf_counter()
     model.fit(x, y)

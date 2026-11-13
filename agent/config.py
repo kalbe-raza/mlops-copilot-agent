@@ -53,6 +53,8 @@ class Settings:
     # LLM
     gemini_api_key: str | None = field(default=None, repr=False)
     gemini_model: str = "gemini-2.5-flash"
+    gemini_fallback_models: list[str] = field(default_factory=lambda: ["gemini-3-flash-preview",
+                                                                        "gemini-3.5-flash-lite"])
     # Agent behaviour
     tool_timeout_seconds: float = 45.0
     max_agent_steps: int = 12
@@ -84,6 +86,8 @@ class Settings:
             k8s_context=_env("K8S_CONTEXT"),
             gemini_api_key=_env("GEMINI_API_KEY", "gemini_api_key", "GOOGLE_API_KEY"),
             gemini_model=_env("GEMINI_MODEL", default="gemini-2.5-flash"),
+            gemini_fallback_models=_csv(os.getenv("GEMINI_FALLBACK_MODELS"),
+                                        "gemini-3-flash-preview,gemini-3.5-flash-lite"),
             tool_timeout_seconds=float(_env("TOOL_TIMEOUT_SECONDS", default="45")),
             max_agent_steps=int(_env("MAX_AGENT_STEPS", default="12")),
             log_file=Path(_env("AGENT_LOG_FILE", default=str(root / "logs" / "agent.jsonl"))),

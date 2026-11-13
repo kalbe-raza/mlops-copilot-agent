@@ -268,3 +268,36 @@ def test_partial_outage_never_concludes_no_retraining(settings):
     assert assessment.data["retraining_recommended"] is None
     assert "Cannot determine whether retraining is necessary" in resp.answer
     assert "Retraining is not necessary" not in resp.answer
+
+
+def test_grounding_does_not_misread_identifiers_as_negative_numbers():
+    ok = ToolResult(call_id="c", request_id="r", tool="t", status=ToolStatus.SUCCESS, duration_ms=1,
+                    data={"run_name": "airflow-random_forest-9.631695+00:00"})
+    assert ungrounded_numbers("run airflow-random_forest-9.631695 was compared", [ok]) == []
+
+
+def test_gemini_quota_exhaustion_switches_to_fallback_model(settings):
+    registry = build_registry(settings, dvc=FakeDVC(settings), mlflow=FakeMLflow(settings),
+                              airflow=FakeAirflow(settings), k8s=FakeK8s(settings))
+
+    class QuotaError(Exception):
+        code = 429
+
+    class Client:
+        def __init__(self):
+            self.models, self.calls = self, []
+
+        def generate_content(self, model, contents, config):
+            from google.genai import types
+
+            self.calls.append(model)
+            if model == "primary":
+                raise QuotaError("RESOURCE_EXHAUSTED per-day quota")
+            text = "**Answer**\nok"
+            return NS(candidates=[NS(content=types.Content(role="model", parts=[types.Part.from_text(text=text)]))],
+                      function_calls=None, text=text)
+
+    client = Client()
+    llm = GeminiPlanner("k", "primary", registry, client=client, fallback_models=["secondary"], retry_backoff=0)
+    answer, _ = llm.run("hi", None, "r1")
+    assert answer.endswith("ok") and client.calls == ["primary", "secondary"] and llm.model == "secondary"

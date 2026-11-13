@@ -51,7 +51,9 @@ Required tool sequences (call every listed tool; add others if useful)
 - "Why is the API unavailable / unhealthy": k8s_find_unhealthy_pods, k8s_list_services,
   k8s_list_deployments, k8s_get_events, then k8s_get_pod_logs for an unhealthy pod.
 - Pipeline failure: airflow_get_failed_tasks; if validate_data failed also dvc_check_data_changes.
-- Compare runs / recommend a candidate: mlflow_compare_runs.
+- Compare runs / recommend a candidate: mlflow_compare_runs. List EVERY compared run with its F1, recall,
+  train/test gap and quality-gate status, explain the selection, and state that the recommendation is a
+  candidate for review, not an automatic production promotion.
 
 Answer in concise Markdown with these sections:
 **Answer** - direct answer in 1-3 sentences.
@@ -72,7 +74,8 @@ class GeminiPlanner:
     name = "gemini"
 
     def __init__(self, api_key: str | None, model: str, registry: ToolRegistry, max_steps: int = 12,
-                 client: Any = None, max_retries: int = 2, retry_backoff: float = 3.0) -> None:
+                 client: Any = None, max_retries: int = 2, retry_backoff: float = 3.0,
+                 fallback_models: list[str] | None = None) -> None:
         if not api_key and client is None:
             raise LLMError("no Gemini API key configured (GEMINI_API_KEY / gemini_api_key)")
         self.model = model
@@ -83,6 +86,8 @@ class GeminiPlanner:
         self.history: list[Any] = []
         self.max_retries = max_retries
         self.retry_backoff = retry_backoff
+        # Models tried in order when one is out of quota (free tiers have small per-model daily limits).
+        self.models = [model, *[m for m in (fallback_models or []) if m != model]]
 
     @property
     def client(self) -> Any:
@@ -110,19 +115,28 @@ class GeminiPlanner:
         )
 
     def _generate(self, contents: list[Any], config: Any) -> Any:
-        """Call Gemini, retrying transient overload/rate-limit errors with exponential back-off."""
+        """Call Gemini. Transient overload errors are retried with back-off; when a model's quota is
+        exhausted (HTTP 429) the next configured fallback model is used for the rest of the session."""
         last: Exception | None = None
-        for attempt in range(self.max_retries + 1):
-            try:
-                return self.client.models.generate_content(model=self.model, contents=contents, config=config)
-            except Exception as exc:  # noqa: BLE001 - classify below, surface as LLMError for graceful fallback
-                last = exc
-                code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-                if code in TRANSIENT_CODES and attempt < self.max_retries:
-                    time.sleep(self.retry_backoff * (2 ** attempt))
-                    continue
-                break
-        raise LLMError(f"Gemini request failed: {type(last).__name__}: {str(last)[:300]}") from last
+        while True:
+            for attempt in range(self.max_retries + 1):
+                try:
+                    return self.client.models.generate_content(model=self.model, contents=contents, config=config)
+                except Exception as exc:  # noqa: BLE001 - classify below, surface as LLMError for graceful fallback
+                    last = exc
+                    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                    if code == 429:
+                        break  # quota: retrying the same model will not help
+                    if code in TRANSIENT_CODES and attempt < self.max_retries:
+                        time.sleep(self.retry_backoff * (2 ** attempt))
+                        continue
+                    break
+            code = getattr(last, "code", None) or getattr(last, "status_code", None)
+            idx = self.models.index(self.model)
+            if code in TRANSIENT_CODES and idx + 1 < len(self.models):
+                self.model = self.models[idx + 1]
+                continue
+            raise LLMError(f"Gemini request failed ({self.model}): {type(last).__name__}: {str(last)[:300]}") from last
 
     def reset(self) -> None:
         self.history = []

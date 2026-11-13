@@ -21,7 +21,7 @@ import logging
 import os
 import re
 import subprocess
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from airflow.sdk import DAG, Param, get_current_context, task
@@ -82,7 +82,7 @@ with DAG(
     tags=["ml", "training", "mlflow", "dvc"],
     params={
         "model_type": Param("random_forest", type="string", enum=MODEL_TYPES),
-        "params": Param({"n_estimators": 300, "max_depth": 8}, type="object"),
+        "params": Param({}, type="object", description="Hyper-parameter overrides (model defaults otherwise)"),
         "experiment": Param("cancer-airflow-pipeline", type="string"),
         "run_name": Param("", type="string"),
     },
@@ -106,7 +106,8 @@ with DAG(
     def evaluate_and_log() -> None:
         ctx = get_current_context()
         p = ctx["params"]
-        run_name = p.get("run_name") or f"airflow-{p['model_type']}-{ctx['run_id'][-14:]}"
+        stamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%S")
+        run_name = p.get("run_name") or f"airflow-{p['model_type']}-{stamp}"
         tags = {"airflow.dag_id": ctx["dag"].dag_id, "airflow.run_id": ctx["run_id"],
                 "pipeline.trigger": "airflow"}
         _run_stage("evaluate", "--experiment", p["experiment"], "--run-name", run_name, "--tags", json.dumps(tags))

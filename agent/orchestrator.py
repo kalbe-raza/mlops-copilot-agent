@@ -51,7 +51,8 @@ def ungrounded_numbers(answer: str, results: list[ToolResult], extra_text: str =
     ``extra_text`` (the user's question) also counts as a source, so user-supplied values are grounded.
     """
     evidence_text = json.dumps([r.data for r in results if r.ok], default=str) + " " + extra_text
-    evidence = [float(v) for v in re.findall(r"-?\d+\.\d+|-?\d+", evidence_text)]
+    # unsigned on purpose: "run-9.63" or "2026-11-13" must not turn into negative numbers
+    evidence = [float(v) for v in re.findall(r"\d+\.\d+|\d+", evidence_text)]
     unmatched = []
     for value, decimals, pct in _numbers_in(answer):
         tol = 0.5 * 10 ** (-decimals) + 1e-9
@@ -77,7 +78,8 @@ class MLOpsAgent:
         if self.llm is None and planner in {"auto", "gemini"}:
             try:
                 self.llm = GeminiPlanner(self.settings.gemini_api_key, self.settings.gemini_model, self.registry,
-                                         self.settings.max_agent_steps)
+                                         self.settings.max_agent_steps,
+                                         fallback_models=self.settings.gemini_fallback_models)
             except LLMError:
                 if planner == "gemini":
                     raise
@@ -126,6 +128,15 @@ class MLOpsAgent:
             if denied and len(denied) == len(results):
                 lines[1] = "The requested operation was not performed because it was blocked by a safety policy."
             return "\n".join(lines), ["all tool calls failed; answer replaced with a failure report"]
+        # Safety notes emitted by tools (e.g. "not an automatic production promotion") are always surfaced,
+        # independent of whether the LLM chose to repeat them.
+        notes = []
+        for r in results:
+            note = r.data.get("note") if r.ok and isinstance(r.data, dict) else None
+            if isinstance(note, str) and note not in answer and note not in notes:
+                notes.append(note)
+        if notes:
+            answer += "\n\n" + "\n\n".join(f"> Tool note: {n}" for n in notes)
         unmatched = ungrounded_numbers(answer, results, question)
         if unmatched:
             answer += ("\n\n> Grounding check: these values were not found in any tool output and should be "
