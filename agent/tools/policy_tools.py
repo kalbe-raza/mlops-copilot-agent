@@ -14,7 +14,7 @@ from typing import Any
 
 from agent.config import Settings
 from agent.schemas import DagRunsInput, DatasetPathInput, DeploymentInput, NoInput, RetrainingAssessmentInput
-from agent.tools.base import ToolError, ToolSpec
+from agent.tools.base import ToolError, ToolSpec, ToolUnavailableError
 
 
 class PolicyTools:
@@ -142,9 +142,23 @@ class PolicyTools:
         except ToolError as exc:
             uncertainties.append(f"Kubernetes deployment could not be inspected: {exc}")
 
+        sources_ok = {k for k in ("champion", "current_dataset", "airflow_recent_runs", "deployment") if k in evidence}
+        if not sources_ok:
+            raise ToolUnavailableError("no evidence source (MLflow, DVC, Airflow, Kubernetes) could be reached; "
+                                       "retraining need cannot be assessed: " + " | ".join(uncertainties))
+        if triggers:
+            decision, recommended = "retrain_recommended", True
+        elif {"champion", "current_dataset"} <= sources_ok:
+            decision, recommended = "no_retraining_needed", False
+        else:
+            # Without the champion's metrics and the current data version the policy cannot be evaluated;
+            # never conclude "no retraining needed" from missing evidence.
+            decision, recommended = "insufficient_evidence", None
         return {
             "model_name": model_name,
-            "retraining_recommended": bool(triggers),
+            "decision": decision,
+            "retraining_recommended": recommended,
+            "evidence_sources": sorted(sources_ok),
             "triggers": triggers,
             "facts": facts,
             "uncertainties": uncertainties,

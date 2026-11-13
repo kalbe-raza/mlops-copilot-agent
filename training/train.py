@@ -314,13 +314,14 @@ def register(workdir: Path, model_name: str) -> dict[str, Any]:
     mlflow.set_tracking_uri(os.getenv("MLFLOW_TRACKING_URI", f"sqlite:///{PROJECT_ROOT / 'mlflow.db'}"))
     client = mlflow.MlflowClient()
     version = mlflow.register_model(run["model_uri"], model_name)
+    vnum = str(version.version)  # int on SQLite stores, str over REST: normalise
     prov = state.get("provenance", {})
     for key in ("dataset.version", "dataset.dvc_md5", "dataset.git_commit"):
         if key in prov:
-            client.set_model_version_tag(model_name, version.version, key, prov[key])
-    client.set_model_version_tag(model_name, version.version, "f1", f"{metrics['f1']:.4f}")
-    client.set_model_version_tag(model_name, version.version, "quality_gate", "passed")
-    client.set_model_version_tag(model_name, version.version, "source_run_id", run["run_id"])
+            client.set_model_version_tag(model_name, vnum, key, prov[key])
+    client.set_model_version_tag(model_name, vnum, "f1", f"{metrics['f1']:.4f}")
+    client.set_model_version_tag(model_name, vnum, "quality_gate", "passed")
+    client.set_model_version_tag(model_name, vnum, "source_run_id", run["run_id"])
 
     promoted = False
     champion_f1 = None
@@ -330,13 +331,13 @@ def register(workdir: Path, model_name: str) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 - no champion yet
         champion = None
     if champion is None or champion_f1 is None or metrics["f1"] >= champion_f1:
-        client.set_registered_model_alias(model_name, "champion", version.version)
+        client.set_registered_model_alias(model_name, "champion", vnum)
         promoted = True
-    client.set_registered_model_alias(model_name, "latest-passed", version.version)
-    result = {"model_name": model_name, "version": version.version, "promoted_to_champion": promoted,
+    client.set_registered_model_alias(model_name, "latest-passed", vnum)
+    result = {"model_name": model_name, "version": vnum, "promoted_to_champion": promoted,
               "previous_champion_f1": champion_f1}
     save_state(workdir, registry=result)
-    LOG.info("registered %s v%s (champion=%s)", model_name, version.version, promoted)
+    LOG.info("registered %s v%s (champion=%s)", model_name, vnum, promoted)
     return result
 
 

@@ -657,17 +657,21 @@ class RuleBasedPlanner:
             a = assess.data
             ev += [f"{f} [assess_retraining_need]" for f in a["facts"]]
             unc += a["uncertainties"]
-            if a["retraining_recommended"]:
+            if a["retraining_recommended"] is True:
                 summary = "**Retraining is recommended** because: " + "; ".join(a["triggers"]) + "."
                 actions.append("Trigger `ml_training_pipeline` explicitly (the agent will ask for confirmation); "
                                "it was NOT started automatically.")
+            elif a["retraining_recommended"] is None:
+                summary = ("**Cannot determine whether retraining is necessary**: the champion model metrics and/or "
+                           "the current dataset version could not be verified (see uncertainties).")
+                actions.append("Restore access to the unavailable services and ask again.")
             else:
                 summary = ("**Retraining is not necessary** based on the recorded evidence: no policy trigger fired "
                            f"(freshness {a['policy']['max_model_age_days']}d, F1 floor {a['policy']['min_f1']}, "
                            "data version, quality gate).")
             if health.ok and health.data["unhealthy_pods"]:
                 actions.append("Fix the unhealthy pods first - this is an operational issue, not a model issue.")
-            if not runs.ok or (runs.ok and runs.data["latest_state"] == "failed"):
+            if runs.ok and runs.data["latest_state"] == "failed":
                 actions.append("Investigate the latest failed pipeline run before any retraining.")
         else:
             summary = "The retraining policy could not be evaluated."

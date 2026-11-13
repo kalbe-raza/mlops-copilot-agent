@@ -6,7 +6,7 @@ import json
 import logging
 import time
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from agent.logging_utils import JsonFormatter, register_secrets
 from agent.schemas import NoInput, ToolStatus
@@ -15,6 +15,7 @@ from tests.conftest import make_executor
 
 
 class EchoInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")  # same policy as every real tool input schema
     text: str = Field(..., min_length=1)
     count: int = Field(1, ge=1, le=3)
 

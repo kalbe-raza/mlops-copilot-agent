@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  MLFLOW_DISABLE_AGENT_HINT: "1"
+
+jobs:
+  lint-and-test:
+    name: Lint + unit tests (external services mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install locked environment
+        run: uv sync --frozen --python "$PYTHON_VERSION"
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Verify dataset reproducibility against the committed DVC hash
+        run: |
+          uv run python scripts/make_dataset.py --version v2 --out /tmp/dataset.csv
+          expected=$(grep 'md5:' data/raw/dataset.csv.dvc | awk '{print $3}')
+          actual=$(md5sum /tmp/dataset.csv | awk '{print $1}')
+          echo "expected=$expected actual=$actual"
+          test "$expected" = "$actual"
+      - name: Pytest
+        run: uv run pytest --cov=agent --cov=training --cov=api --cov-report=term-missing:skip-covered
+
+  dag-validation:
+    name: Airflow 3 DAG integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AIRFLOW_HOME: /tmp/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install Apache Airflow 3.4.0 (official constraints)
+        run: |
+          pip install "apache-airflow==3.4.0" pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.4.0/constraints-${PYTHON_VERSION}.txt"
+      - name: Initialise metadata DB
+        run: airflow db migrate
+      - name: DAG tests
+        run: pytest --noconftest -p no:cacheprovider tests/test_dag.py -v
+
+  docker-build:
+    name: Build inference image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Train a model on the versioned dataset (local MLflow store) and export it
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///ci-mlflow.db
+        run: |
+          uv sync --frozen --python "$PYTHON_VERSION"
+          uv run python scripts/make_dataset.py --version v2
+          uv run python -m training.train run-all --workdir /tmp/ci-run --model-type svm --params '{"C": 3.0}' \
+            --experiment ci --run-name ci-build
+          uv run python scripts/export_model.py
+      - name: Docker build
+        run: docker build -t mlops-inference-api:ci --build-arg APP_VERSION=ci .
+      - name: Smoke test container health
+        run: |
+          docker run -d --name api -p 8000:8000 mlops-inference-api:ci
+          for i in $(seq 1 30); do curl -sf localhost:8000/health/ready && break; sleep 1; done
+          curl -sf localhost:8000/version
+          docker rm -f api
