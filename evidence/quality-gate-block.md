@@ -1,6 +1,25 @@
-# Quality gate blocking promotion (observed during testing)
+# Quality gate blocking promotion + an unexpected failure found during testing
 
-This run was recorded while the DAG still applied random-forest default hyper-parameters (`n_estimators=300, max_depth=8`) to every model type. With those parameters gradient boosting overfits; the quality gate failed and `register_model` stayed `upstream_failed`, so nothing was promoted. The Gemini free-tier daily quota had been exhausted, so the agent used its deterministic planner (recorded in `logs/agent.jsonl` as `llm_fallback`). The DAG was then fixed to use per-model defaults (`training/train.py::DEFAULT_PARAMS`).
+## What happened
+
+1. The request "Trigger the model training pipeline with a gradient boosting model" was sent to the Gemini planner.
+   Gemini called `airflow_trigger_dag` (run `manual__2026-11-13T17:47:47`), which executed the DAG.
+2. Gemini's *next* request failed with `429 RESOURCE_EXHAUSTED` (free tier: 20 requests/day for
+   `gemini-2.5-flash`, see `logs/agent.jsonl` event `llm_fallback`).
+3. The orchestrator fell back to the deterministic planner, which **triggered the DAG a second time**
+   (`manual__2026-11-13T17:48:24`) - the transcript below is that fallback answer.
+4. Both runs failed at `quality_gate`: at that time the DAG passed random-forest default hyper-parameters
+   (`n_estimators=300, max_depth=8`) to every estimator; gradient boosting with depth 8 overfits
+   (F1 0.9216 < 0.93, recall 0.8868 < 0.90, train/test gap 0.0784 > 0.06). `register_model` stayed
+   `upstream_failed`, so **nothing was promoted** - the gate worked as designed.
+
+## Root causes and fixes
+
+| Problem | Root cause | Fix (commit in history) | Regression test |
+|---|---|---|---|
+| Duplicate DAG trigger | Fallback re-planned from scratch and ignored tool calls the LLM had already executed | `LLMError.partial_results`; if a state-changing call already succeeded the fallback only summarises it (`agent/orchestrator.py`) | `test_llm_failure_after_a_state_change_never_repeats_it` |
+| Wrong hyper-parameters for non-RF models | DAG `params` default was RF-specific | Per-model `DEFAULT_PARAMS` in `training/train.py`, DAG default `params={}` | `test_rule_planner_*`, re-run `manual__2026-11-13T17:52:13` succeeded |
+| LLM quota exhaustion | Small per-model free-tier quota | Model fallback chain (`GEMINI_FALLBACK_MODELS`) | `test_gemini_quota_exhaustion_switches_to_fallback_model` |
 
 ## Trigger the model training pipeline with a gradient boosting model and report whether execution succeeded.
 

@@ -67,7 +67,15 @@ TRANSIENT_CODES = {429, 500, 503, 504}
 
 
 class LLMError(RuntimeError):
-    """The LLM backend failed (missing key, quota, network); the orchestrator may fall back."""
+    """The LLM backend failed (missing key, quota, network); the orchestrator may fall back.
+
+    ``partial_results`` holds tool calls already executed in this request before the failure, so the
+    fallback can reuse them and never repeats a state-changing operation.
+    """
+
+    def __init__(self, message: str, partial_results: list[ToolResult] | None = None) -> None:
+        super().__init__(message)
+        self.partial_results: list[ToolResult] = partial_results or []
 
 
 class GeminiPlanner:
@@ -149,16 +157,20 @@ class GeminiPlanner:
         contents = [*self.history, user_turn]
         results: list[ToolResult] = []
         for _ in range(self.max_steps):
-            response = self._generate(contents, config)
+            try:
+                response = self._generate(contents, config)
+            except LLMError as exc:
+                exc.partial_results = results
+                raise
             candidate = (response.candidates or [None])[0]
             if candidate is None or candidate.content is None:
-                raise LLMError("Gemini returned no candidate (possibly blocked or empty response)")
+                raise LLMError("Gemini returned no candidate (possibly blocked or empty response)", results)
             calls = response.function_calls or []
             contents.append(candidate.content)
             if not calls:
                 text = (response.text or "").strip()
                 if not text:
-                    raise LLMError("Gemini returned an empty answer")
+                    raise LLMError("Gemini returned an empty answer", results)
                 # keep only question/answer pairs as conversational memory (never dangling tool calls)
                 answer_turn = types.Content(role="model", parts=[types.Part.from_text(text=text)])
                 self.history = [*self.history, user_turn, answer_turn][-8:]
@@ -170,4 +182,4 @@ class GeminiPlanner:
                 payload = json.loads(json.dumps(result.for_llm(), default=str))
                 parts.append(types.Part.from_function_response(name=call.name, response=payload))
             contents.append(types.Content(role="user", parts=parts))
-        raise LLMError(f"step budget of {self.max_steps} exhausted before a final answer")
+        raise LLMError(f"step budget of {self.max_steps} exhausted before a final answer", results)

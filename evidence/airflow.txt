@@ -1,0 +1,63 @@
+# Airflow 3 REST API evidence - 2026-11-13T17:59:36+00:00 (JWT from POST /auth/token)
+
+$ GET /api/v2/version
+ {'version': '3.4.0', 'git_version': '.release:619a787ac81e8b7c8a9102fc78e3f0b00625d04e'}
+
+$ GET /api/v2/dags
+  ml_training_pipeline paused=False tags=['dvc', 'ml', 'mlflow', 'training']
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns?order_by=run_after
+  manual__2026-11-13T17:18:09.631695+00:00      success  conf={}
+  manual__2026-11-13T17:47:47.183632+00:00      failed   conf={'model_type': 'gradient_boosting'}
+  manual__2026-11-13T17:48:24.526204+00:00      failed   conf={'model_type': 'gradient_boosting'}
+  manual__2026-11-13T17:52:13.354368+00:00      success  conf={'model_type': 'gradient_boosting'}
+  manual__2026-11-13T17:52:56.308674+00:00      failed   conf={}
+  manual__2026-11-13T17:54:57.948146+00:00      success  conf={}
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:18:09.631695+00:00/taskInstances   [success]
+  validate_data      success          try=1 duration=6.3s
+  preprocess_data    success          try=1 duration=1.8s
+  train_model        success          try=1 duration=2.5s
+  evaluate_and_log   success          try=1 duration=6.6s
+  quality_gate       success          try=1 duration=3.6s
+  register_model     success          try=1 duration=3.7s
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:47:47.183632+00:00/taskInstances   [failed]
+  validate_data      success          try=1 duration=2.4s
+  preprocess_data    success          try=1 duration=2.2s
+  train_model        success          try=1 duration=3.2s
+  evaluate_and_log   success          try=1 duration=6.1s
+  quality_gate       failed           try=1 duration=3.1s
+  register_model     upstream_failed  try=0 duration=0.0s
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:48:24.526204+00:00/taskInstances   [failed]
+  validate_data      success          try=1 duration=1.8s
+  preprocess_data    success          try=1 duration=1.8s
+  train_model        success          try=1 duration=3.0s
+  evaluate_and_log   success          try=1 duration=6.1s
+  quality_gate       failed           try=1 duration=3.5s
+  register_model     upstream_failed  try=0 duration=0.0s
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:52:13.354368+00:00/taskInstances   [success]
+  validate_data      success          try=1 duration=1.8s
+  preprocess_data    success          try=1 duration=1.8s
+  train_model        success          try=1 duration=2.3s
+  evaluate_and_log   success          try=1 duration=5.6s
+  quality_gate       success          try=1 duration=3.0s
+  register_model     success          try=1 duration=3.7s
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:52:56.308674+00:00/taskInstances   [failed]
+  validate_data      failed           try=1 duration=1.8s
+  preprocess_data    upstream_failed  try=0 duration=0.0s
+  train_model        upstream_failed  try=0 duration=0.0s
+  evaluate_and_log   upstream_failed  try=0 duration=0.0s
+  quality_gate       upstream_failed  try=0 duration=0.0s
+  register_model     upstream_failed  try=0 duration=0.0s
+
+$ GET /api/v2/dags/ml_training_pipeline/dagRuns/manual__2026-11-13T17:54:57.948146+00:00/taskInstances   [success]
+  validate_data      success          try=1 duration=2.1s
+  preprocess_data    success          try=1 duration=2.2s
+  train_model        success          try=1 duration=2.7s
+  evaluate_and_log   success          try=1 duration=7.4s
+  quality_gate       success          try=1 duration=3.4s
+  register_model     success          try=1 duration=3.7s

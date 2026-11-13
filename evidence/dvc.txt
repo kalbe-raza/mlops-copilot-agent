@@ -1,0 +1,76 @@
+# DVC evidence - 2026-11-13T17:59:29Z
+
+$ git tag -n --list data-v*
+data-v1.0       Dataset v1.0: initial 400-patient extract
+data-v2.0       Dataset v2.0: full 569-patient refresh
+
+$ git log --oneline -- data/raw/dataset.csv.dvc
+cefe3d7 data: version patient dataset v2.0 (full 569-row refresh, +169 patients)
+ea25fbe data: version patient dataset v1.0 (400-row initial extract) with DVC
+
+$ cat data/raw/dataset.csv.dvc
+outs:
+- md5: 44042793903d981829eb545e67d08fee
+  size: 124806
+  hash: md5
+  path: dataset.csv
+
+$ dvc remote list
+localstore      /home/kalbe-raza/kalbe_raza/mlops_ass2/dvc-storage      
+(default)
+
+$ dvc status
+Data and pipelines are up to date.
+
+$ dvc data status --granular
+No changes.
+(there are changes not tracked by dvc, use "git status" to see)
+
+$ dvc diff data-v1.0 data-v2.0
+Modified:
+    data/raw/dataset.csv
+
+files summary: 1 modified
+
+$ dvc dag
++--------------------------+  
+| data/raw/dataset.csv.dvc |  
++--------------------------+  
+              *               
+              *               
+              *               
+        +----------+          
+        | validate |          
+        +----------+          
+              *               
+              *               
+              *               
+       +------------+         
+       | preprocess |         
+       +------------+         
+         **        **         
+       **            *        
+      *               **      
++-------+               *     
+| train |             **      
++-------+            *        
+         **        **         
+           **    **           
+             *  *             
+        +----------+          
+        | evaluate |          
+        +----------+          
+
+$ dvc metrics show
+Path                           accuracy    f1      f1_gap    precision    recall    roc_auc    train_f1
+pipeline_outputs/metrics.json  0.96503     0.9505  0.0495    1.0          0.90566   0.99539    1.0
+
+$ dvc params diff HEAD~3
+
+$ dvc get . data/raw/dataset.csv --rev data-v1.0 -o /tmp/dataset-v1.csv --force && md5sum /tmp/dataset-v1.csv && wc -l /tmp/dataset-v1.csv
+c0437af750ce5e7418d94a4689cebac6  /tmp/dataset-v1.csv
+401 /tmp/dataset-v1.csv
+
+$ git show data-v1.0:data/raw/dataset.csv.dvc | grep md5
+- md5: c0437af750ce5e7418d94a4689cebac6
+  hash: md5

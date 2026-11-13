@@ -1,0 +1,41 @@
+# MLflow evidence - 2026-11-13T17:59:35+00:00 (MlflowClient, http://127.0.0.1:5000)
+
+## Experiment 'cancer-airflow-pipeline' (id 4) - 5 runs
+run name                               status    model                data            f1  recall     gap  gate
+airflow-random_forest-9.631695+00:00   FINISHED  random_forest        data-v2.0   0.9505  0.9057  0.0495  passed
+airflow-gradient_boosting-20261113T174758 FINISHED  gradient_boosting    data-v2.0   0.9216  0.8868  0.0784  failed
+airflow-gradient_boosting-20261113T174833 FINISHED  gradient_boosting    data-v2.0   0.9216  0.8868  0.0784  failed
+airflow-gradient_boosting-20261113T175221 FINISHED  gradient_boosting    data-v2.0   0.9505  0.9057  0.0495  passed
+airflow-random_forest-20261113T175507  FINISHED  random_forest        data-v2.0   0.9505  0.9057  0.0495  passed
+
+## Experiment 'cancer-dvc-pipeline' (id 3) - 1 runs
+run name                               status    model                data            f1  recall     gap  gate
+dvc-repro                              FINISHED  random_forest        data-v2.0   0.9505  0.9057  0.0495  -
+
+## Experiment 'cancer-tuning-v2' (id 2) - 6 runs
+run name                               status    model                data            f1  recall     gap  gate
+run-07-logistic_regression             FINISHED  logistic_regression  data-v2.0   0.9515  0.9245  0.0326  passed
+run-08-logistic_regression             FINISHED  logistic_regression  data-v2.0   0.9515  0.9245  0.0328  passed
+run-09-random_forest                   FINISHED  random_forest        data-v2.0   0.9505  0.9057  0.0495  passed
+run-10-gradient_boosting               FINISHED  gradient_boosting    data-v2.0   0.9505  0.9057  0.0495  passed
+run-11-svm                             FINISHED  svm                  data-v2.0   0.9709  0.9434  0.0164  passed
+run-12-decision_stump                  FINISHED  decision_stump       data-v2.0   0.8298  0.7358  0.0728  failed
+
+## Experiment 'cancer-baseline-v1' (id 1) - 6 runs
+run name                               status    model                data            f1  recall     gap  gate
+run-01-logistic_regression             FINISHED  logistic_regression  data-v1.0   0.9444  0.9189  0.0511  passed
+run-02-logistic_regression             FINISHED  logistic_regression  data-v1.0   0.9143  0.8649  0.0721  failed
+run-03-random_forest                   FINISHED  random_forest        data-v1.0   0.9167  0.8919  0.0833  failed
+run-04-gradient_boosting               FINISHED  gradient_boosting    data-v1.0   0.8611  0.8378  0.1389  failed
+run-05-svm                             FINISHED  svm                  data-v1.0   0.9014  0.8649  0.0941  failed
+run-06-decision_stump                  FINISHED  decision_stump       data-v1.0   0.8358  0.7568  0.0851  failed
+
+## Experiment 'Default' (id 0) - 0 runs
+run name                               status    model                data            f1  recall     gap  gate
+
+## Registered model 'cancer-risk-classifier' aliases={'champion': '2', 'latest-passed': '5'}
+  v1   run=run-01-logistic_regression             f1=0.9444 data=data-v1.0 md5=c0437af7
+  v2   run=run-11-svm                             f1=0.9709 data=data-v2.0 md5=44042793
+  v3   run=airflow-random_forest-9.631695+00:00   f1=0.9505 data=data-v2.0 md5=44042793
+  v4   run=airflow-gradient_boosting-20261113T175221 f1=0.9505 data=data-v2.0 md5=44042793
+  v5   run=airflow-random_forest-20261113T175507  f1=0.9505 data=data-v2.0 md5=44042793

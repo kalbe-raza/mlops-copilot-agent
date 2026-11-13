@@ -98,10 +98,19 @@ class MLOpsAgent:
                 answer, results = self.llm.run(question, self.executor, request_id)
                 planner_name = f"gemini:{self.llm.model}"
             except LLMError as exc:
-                log_event(self.logger, "llm_fallback", level=logging.WARNING, request_id=request_id, error=str(exc))
-                notes.append(f"LLM planner unavailable ({str(exc)[:120]}); answered with the deterministic planner.")
-                answer, more = self.rules.run(question, self.executor, request_id)
-                results = results + more
+                log_event(self.logger, "llm_fallback", level=logging.WARNING, request_id=request_id, error=str(exc),
+                          partial_tools=[r.tool for r in exc.partial_results])
+                results = list(exc.partial_results)
+                if any(r.ok and self._is_mutating(r.tool) for r in results):
+                    # A state-changing action already ran: never repeat it - report what was done instead.
+                    notes.append(f"LLM planner failed mid-request ({str(exc)[:120]}); reporting the completed "
+                                 "tool calls without re-executing them.")
+                    answer = self._summarise(results)
+                else:
+                    notes.append(f"LLM planner unavailable ({str(exc)[:120]}); answered with the deterministic "
+                                 "planner.")
+                    answer, more = self.rules.run(question, self.executor, request_id)
+                    results = results + more
         else:
             answer, results = self.rules.run(question, self.executor, request_id)
 
@@ -123,6 +132,10 @@ class MLOpsAgent:
                 module = r.tool.split("_", 1)[0]
                 module = {"k8s": "kubernetes", "assess": "policy", "get": "policy"}.get(module, module)
                 hint = REMEDIATION.get(module, "check the service configuration")
+                if r.status == ToolStatus.DENIED:
+                    hint = "blocked by the agent's safety policy (approved namespaces/DAGs, explicit confirmation)"
+                elif r.status == ToolStatus.INVALID_REQUEST:
+                    hint = "correct the request arguments"
                 lines.append(f"- `{r.tool}`: **{r.status.value}** - {r.error} (fix: {hint})")
             denied = [r for r in results if r.status == ToolStatus.DENIED]
             if denied and len(denied) == len(results):
@@ -143,6 +156,24 @@ class MLOpsAgent:
                        f"treated as unverified: {', '.join(unmatched)}")
             return answer, [f"unverified values: {unmatched}"]
         return answer, []
+
+    def _is_mutating(self, tool: str) -> bool:
+        spec = self.registry.get(tool)
+        return bool(spec and spec.mutating)
+
+    @staticmethod
+    def _summarise(results: list[ToolResult]) -> str:
+        lines = ["**Answer**", "The following operations were completed before the planner failed:", "",
+                 "**Evidence**"]
+        for r in results:
+            if r.ok:
+                data = r.data if isinstance(r.data, dict) else {"result": r.data}
+                keys = ("dag_id", "dag_run_id", "final_state", "deployment", "action", "replicas", "restarted_at")
+                summary = {k: data[k] for k in keys if k in data} or {k: data[k] for k in list(data)[:5]}
+                lines.append(f"- `{r.tool}` succeeded: {json.dumps(summary, default=str)[:400]}")
+            else:
+                lines.append(f"- `{r.tool}` returned **{r.status.value}**: {r.error}")
+        return "\n".join(lines)
 
     def reset(self) -> None:
         if self.llm is not None:

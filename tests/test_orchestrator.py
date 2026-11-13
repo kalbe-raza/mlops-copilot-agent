@@ -301,3 +301,23 @@ def test_gemini_quota_exhaustion_switches_to_fallback_model(settings):
     llm = GeminiPlanner("k", "primary", registry, client=client, fallback_models=["secondary"], retry_backoff=0)
     answer, _ = llm.run("hi", None, "r1")
     assert answer.endswith("ok") and client.calls == ["primary", "secondary"] and llm.model == "secondary"
+
+
+def test_llm_failure_after_a_state_change_never_repeats_it(settings):
+    """Regression: a quota error after the LLM triggered the DAG must not make the fallback trigger it again."""
+
+    class TriggerThenFail:
+        model = "scripted"
+
+        def run(self, question, executor, request_id):
+            done = [executor.execute("airflow_trigger_dag", {"conf": {"model_type": "svm"}}, request_id)]
+            raise LLMError("429 RESOURCE_EXHAUSTED", partial_results=done)
+
+        def reset(self):
+            pass
+
+    FakeAirflow.triggered = 0
+    resp = _agent(settings, planner="gemini", llm=TriggerThenFail()).ask("Trigger the training pipeline")
+    assert FakeAirflow.triggered == 1
+    assert resp.tools_used == ["airflow_trigger_dag"]
+    assert "without re-executing" in resp.answer and "airflow_trigger_dag" in resp.answer

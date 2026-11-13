@@ -1,0 +1,215 @@
+# Kubernetes evidence - 2026-11-13T17:59:36Z (kind cluster 'mlops')
+
+$ kubectl get nodes -o wide
+NAME                  STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION             CONTAINER-RUNTIME
+mlops-control-plane   Ready    control-plane   65m   v1.37.0   172.22.0.2    <none>        Debian GNU/Linux 13 (trixie)   7.0.0-38-generic (amd64)   containerd://2.3.4
+
+$ kubectl -n mlops-agent get deploy,rs,pods,svc,endpointslices,cm -o wide
+NAME                            READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS      IMAGES                      SELECTOR
+deployment.apps/inference-api   2/2     2            2           28m   inference-api   mlops-inference-api:1.0.0   app.kubernetes.io/name=inference-api
+
+NAME                                       DESIRED   CURRENT   READY   AGE   CONTAINERS      IMAGES                      SELECTOR
+replicaset.apps/inference-api-59f7cb7447   0         0         0       28m   inference-api   mlops-inference-api:1.0.0   app.kubernetes.io/name=inference-api,pod-template-hash=59f7cb7447
+replicaset.apps/inference-api-67f5c5fbdf   2         2         2       90s   inference-api   mlops-inference-api:1.0.0   app.kubernetes.io/name=inference-api,pod-template-hash=67f5c5fbdf
+
+NAME                                 READY   STATUS    RESTARTS   AGE   IP            NODE                  NOMINATED NODE   READINESS GATES
+pod/inference-api-67f5c5fbdf-95xtq   1/1     Running   0          90s   10.244.0.9    mlops-control-plane   <none>           <none>
+pod/inference-api-67f5c5fbdf-bhlbp   1/1     Running   0          83s   10.244.0.10   mlops-control-plane   <none>           <none>
+
+NAME                    TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+service/inference-api   ClusterIP   10.96.9.254   <none>        80/TCP    30m   app.kubernetes.io/name=inference-api
+
+NAME                                                 ADDRESSTYPE   PORTS   ENDPOINTS                AGE
+endpointslice.discovery.k8s.io/inference-api-vck2s   IPv4          8000    10.244.0.9,10.244.0.10   30m
+
+NAME                             DATA   AGE
+configmap/inference-api-config   6      30m
+configmap/kube-root-ca.crt       1      30m
+
+$ kubectl -n mlops-agent describe deploy inference-api
+Name:                   inference-api
+Namespace:              mlops-agent
+CreationTimestamp:      Fri, 13 Nov 2026 22:30:48 +0500
+Labels:                 app.kubernetes.io/name=inference-api
+                        app.kubernetes.io/part-of=mlops-copilot
+                        app.kubernetes.io/version=1.0.0
+Annotations:            deployment.kubernetes.io/revision: 2
+Selector:               app.kubernetes.io/name=inference-api
+Replicas:               2 desired | 2 updated | 2 total | 2 available | 0 unavailable
+StrategyType:           RollingUpdate
+MinReadySeconds:        0
+RollingUpdateStrategy:  0 max unavailable, 1 max surge
+Pod Template:
+  Labels:       app.kubernetes.io/name=inference-api
+                app.kubernetes.io/part-of=mlops-copilot
+                app.kubernetes.io/version=1.0.0
+  Annotations:  kubectl.kubernetes.io/restartedAt: 2026-11-13T17:58:06+00:00
+                mlops.model/name: cancer-risk-classifier
+                mlops.model/registry-alias: champion
+  Containers:
+   inference-api:
+    Image:      mlops-inference-api:1.0.0
+    Port:       8000/TCP (http)
+    Host Port:  0/TCP (http)
+    Limits:
+      cpu:     500m
+      memory:  384Mi
+    Requests:
+      cpu:      100m
+      memory:   192Mi
+    Liveness:   http-get http://:http/health/live delay=15s timeout=2s period=10s successThreshold=1 failureThreshold=3
+    Readiness:  http-get http://:http/health/ready delay=5s timeout=2s period=5s successThreshold=1 failureThreshold=3
+    Environment Variables from:
+      inference-api-config  ConfigMap  Optional: false
+    Environment:            <none>
+    Mounts:
+      /tmp from tmp (rw)
+  Volumes:
+   tmp:
+    Type:          EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:        
+    SizeLimit:     64Mi
+  Node-Selectors:  <none>
+  Tolerations:     <none>
+Conditions:
+  Type           Status  Reason
+  ----           ------  ------
+  Available      True    MinimumReplicasAvailable
+  Progressing    True    NewReplicaSetAvailable
+OldReplicaSets:  inference-api-59f7cb7447 (0/0 replicas created)
+NewReplicaSet:   inference-api-67f5c5fbdf (2/2 replicas created)
+Events:
+  Type    Reason             Age   From                   Message
+  ----    ------             ----  ----                   -------
+  Normal  ScalingReplicaSet  28m   deployment-controller  Scaled up replica set inference-api-59f7cb7447 from 0 to 2
+  Normal  ScalingReplicaSet  90s   deployment-controller  Scaled up replica set inference-api-67f5c5fbdf from 0 to 1
+  Normal  ScalingReplicaSet  83s   deployment-controller  Scaled down replica set inference-api-59f7cb7447 from 2 to 1
+  Normal  ScalingReplicaSet  83s   deployment-controller  Scaled up replica set inference-api-67f5c5fbdf from 1 to 2
+  Normal  ScalingReplicaSet  77s   deployment-controller  Scaled down replica set inference-api-59f7cb7447 from 1 to 0
+
+$ kubectl -n mlops-agent get configmap inference-api-config -o yaml
+apiVersion: v1
+data:
+  APP_ENV: kind-local
+  APP_VERSION: 1.0.0
+  LOG_LEVEL: INFO
+  MODEL_METADATA_PATH: /app/models/model_metadata.json
+  MODEL_PATH: /app/models/model.joblib
+  PREDICTION_THRESHOLD: "0.5"
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"APP_ENV":"kind-local","APP_VERSION":"1.0.0","LOG_LEVEL":"INFO","MODEL_METADATA_PATH":"/app/models/model_metadata.json","MODEL_PATH":"/app/models/model.joblib","PREDICTION_THRESHOLD":"0.5"},"kind":"ConfigMap","metadata":{"annotations":{},"labels":{"app.kubernetes.io/name":"inference-api","app.kubernetes.io/part-of":"mlops-copilot"},"name":"inference-api-config","namespace":"mlops-agent"}}
+  creationTimestamp: "2026-11-13T17:29:31Z"
+  labels:
+    app.kubernetes.io/name: inference-api
+    app.kubernetes.io/part-of: mlops-copilot
+  name: inference-api-config
+  namespace: mlops-agent
+  resourceVersion: "5947"
+  uid: 9e9e02d8-d33f-4578-bff1-ccc8485c8e73
+
+$ kubectl -n mlops-agent get events --sort-by=.lastTimestamp
+LAST SEEN   TYPE      REASON              OBJECT                                MESSAGE
+28m         Normal    Scheduled           pod/inference-api-59f7cb7447-bcptc    Successfully assigned mlops-agent/inference-api-59f7cb7447-bcptc to mlops-control-plane
+28m         Normal    ScalingReplicaSet   deployment/inference-api              Scaled up replica set inference-api-59f7cb7447 from 0 to 2
+28m         Normal    SuccessfulCreate    replicaset/inference-api-59f7cb7447   Created pod: inference-api-59f7cb7447-bcptc
+28m         Normal    SuccessfulCreate    replicaset/inference-api-59f7cb7447   Created pod: inference-api-59f7cb7447-v4kq5
+28m         Normal    Scheduled           pod/inference-api-59f7cb7447-v4kq5    Successfully assigned mlops-agent/inference-api-59f7cb7447-v4kq5 to mlops-control-plane
+28m         Normal    Started             pod/inference-api-59f7cb7447-v4kq5    Container started
+28m         Normal    Pulled              pod/inference-api-59f7cb7447-bcptc    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+28m         Normal    Created             pod/inference-api-59f7cb7447-bcptc    Container created
+28m         Normal    Started             pod/inference-api-59f7cb7447-bcptc    Container started
+28m         Normal    Created             pod/inference-api-59f7cb7447-v4kq5    Container created
+28m         Normal    Pulled              pod/inference-api-59f7cb7447-v4kq5    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+28m         Warning   Unhealthy           pod/inference-api-59f7cb7447-v4kq5    Readiness probe failed: Get "http://10.244.0.6:8000/health/ready": dial tcp 10.244.0.6:8000: connect: connection refused
+28m         Warning   Unhealthy           pod/inference-api-59f7cb7447-bcptc    Readiness probe failed: Get "http://10.244.0.5:8000/health/ready": dial tcp 10.244.0.5:8000: connect: connection refused
+3m53s       Normal    Killing             pod/inference-api-59f7cb7447-bcptc    Stopping container inference-api
+3m53s       Normal    Scheduled           pod/inference-api-59f7cb7447-gkh9t    Successfully assigned mlops-agent/inference-api-59f7cb7447-gkh9t to mlops-control-plane
+3m53s       Normal    SuccessfulCreate    replicaset/inference-api-59f7cb7447   Created pod: inference-api-59f7cb7447-gkh9t
+3m53s       Normal    SuccessfulCreate    replicaset/inference-api-59f7cb7447   Created pod: inference-api-59f7cb7447-62qrf
+3m53s       Normal    Killing             pod/inference-api-59f7cb7447-v4kq5    Stopping container inference-api
+3m53s       Normal    Scheduled           pod/inference-api-59f7cb7447-62qrf    Successfully assigned mlops-agent/inference-api-59f7cb7447-62qrf to mlops-control-plane
+3m52s       Normal    Pulled              pod/inference-api-59f7cb7447-gkh9t    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+3m52s       Normal    Started             pod/inference-api-59f7cb7447-gkh9t    Container started
+3m52s       Normal    Pulled              pod/inference-api-59f7cb7447-62qrf    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+3m52s       Normal    Created             pod/inference-api-59f7cb7447-gkh9t    Container created
+3m52s       Normal    Started             pod/inference-api-59f7cb7447-62qrf    Container started
+3m52s       Normal    Created             pod/inference-api-59f7cb7447-62qrf    Container created
+110s        Warning   Unhealthy           pod/inference-api-59f7cb7447-62qrf    Readiness probe failed: HTTP probe failed with statuscode: 503
+109s        Warning   Unhealthy           pod/inference-api-59f7cb7447-gkh9t    Readiness probe failed: HTTP probe failed with statuscode: 503
+90s         Normal    ScalingReplicaSet   deployment/inference-api              Scaled up replica set inference-api-67f5c5fbdf from 0 to 1
+90s         Normal    SuccessfulCreate    replicaset/inference-api-67f5c5fbdf   Created pod: inference-api-67f5c5fbdf-95xtq
+90s         Normal    Scheduled           pod/inference-api-67f5c5fbdf-95xtq    Successfully assigned mlops-agent/inference-api-67f5c5fbdf-95xtq to mlops-control-plane
+89s         Normal    Started             pod/inference-api-67f5c5fbdf-95xtq    Container started
+89s         Normal    Pulled              pod/inference-api-67f5c5fbdf-95xtq    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+89s         Normal    Created             pod/inference-api-67f5c5fbdf-95xtq    Container created
+83s         Normal    SuccessfulDelete    replicaset/inference-api-59f7cb7447   Deleted pod: inference-api-59f7cb7447-62qrf
+83s         Normal    Scheduled           pod/inference-api-67f5c5fbdf-bhlbp    Successfully assigned mlops-agent/inference-api-67f5c5fbdf-bhlbp to mlops-control-plane
+83s         Normal    Pulled              pod/inference-api-67f5c5fbdf-bhlbp    Container image "mlops-inference-api:1.0.0" already present on machine and can be accessed by the pod
+83s         Normal    Created             pod/inference-api-67f5c5fbdf-bhlbp    Container created
+83s         Normal    SuccessfulCreate    replicaset/inference-api-67f5c5fbdf   Created pod: inference-api-67f5c5fbdf-bhlbp
+83s         Normal    Killing             pod/inference-api-59f7cb7447-62qrf    Stopping container inference-api
+83s         Normal    ScalingReplicaSet   deployment/inference-api              Scaled down replica set inference-api-59f7cb7447 from 2 to 1
+83s         Normal    ScalingReplicaSet   deployment/inference-api              Scaled up replica set inference-api-67f5c5fbdf from 1 to 2
+82s         Normal    Started             pod/inference-api-67f5c5fbdf-bhlbp    Container started
+77s         Normal    SuccessfulDelete    replicaset/inference-api-59f7cb7447   Deleted pod: inference-api-59f7cb7447-gkh9t
+77s         Normal    Killing             pod/inference-api-59f7cb7447-gkh9t    Stopping container inference-api
+77s         Normal    ScalingReplicaSet   deployment/inference-api              Scaled down replica set inference-api-59f7cb7447 from 1 to 0
+
+$ kubectl -n mlops-agent logs inference-api-67f5c5fbdf-95xtq --tail=8
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+{"ts": "2026-11-13T17:58:11", "level": "INFO", "logger": "inference-api", "message": "model loaded", "model_path": "/app/models/model.joblib", "model_version": "2"}
+{"ts": "2026-11-13T17:58:11", "level": "INFO", "logger": "inference-api", "message": "service started", "app_version": "1.0.0", "ready": true}
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+
+$ kubectl get --raw /api/v1/namespaces/mlops-agent/services/inference-api:http/proxy/version
+{"app_version":"1.0.0","environment":"kind-local","model_loaded":true,"model":{"name":"cancer-risk-classifier","version":"2","alias":"champion","run_id":"2ba8095001f44f0cb17dfcc2fbc5cc6c","run_name":"run-11-svm","model_type":"svm","f1":0.9709,"dataset_version":"data-v2.0","dataset_md5":"44042793903d981829eb545e67d08fee","code_commit":"cefe3d7548c84f8b048367124b6603a2a43653c7","exported_at":"2026-11-13T17:19:03+00:00"},"model_error":null}
+$ kubectl get --raw /api/v1/namespaces/mlops-agent/services/inference-api:http/proxy/health/ready
+{"status":"ready","model_version":"2"}
+$ KUBECONFIG=agent.kubeconfig kubectl auth can-i --list -n mlops-agent
+Resources                                       Non-Resource URLs                      Resource Names         Verbs
+selfsubjectreviews.authentication.k8s.io        []                                     []                     [create]
+selfsubjectaccessreviews.authorization.k8s.io   []                                     []                     [create]
+selfsubjectrulesreviews.authorization.k8s.io    []                                     []                     [create]
+configmaps                                      []                                     []                     [get list watch]
+events                                          []                                     []                     [get list watch]
+pods/log                                        []                                     []                     [get list watch]
+pods                                            []                                     []                     [get list watch]
+services                                        []                                     []                     [get list watch]
+deployments.apps                                []                                     []                     [get list watch]
+replicasets.apps                                []                                     []                     [get list watch]
+clustertrustbundles.certificates.k8s.io         []                                     []                     [get list watch]
+endpointslices.discovery.k8s.io                 []                                     []                     [get list]
+deployments.apps/scale                          []                                     [inference-api]        [get patch]
+                                                [/.well-known/openid-configuration/]   []                     [get]
+                                                [/.well-known/openid-configuration]    []                     [get]
+                                                [/api/*]                               []                     [get]
+                                                [/api]                                 []                     [get]
+                                                [/apis/*]                              []                     [get]
+                                                [/apis]                                []                     [get]
+                                                [/healthz]                             []                     [get]
+                                                [/healthz]                             []                     [get]
+                                                [/livez]                               []                     [get]
+                                                [/livez]                               []                     [get]
+                                                [/openapi/*]                           []                     [get]
+                                                [/openapi]                             []                     [get]
+                                                [/openid/v1/jwks/]                     []                     [get]
+                                                [/openid/v1/jwks]                      []                     [get]
+                                                [/readyz]                              []                     [get]
+                                                [/readyz]                              []                     [get]
+                                                [/version/]                            []                     [get]
+                                                [/version/]                            []                     [get]
+                                                [/version]                             []                     [get]
+                                                [/version]                             []                     [get]
+services/proxy                                  []                                     [inference-api:http]   [get]
+deployments.apps                                []                                     [inference-api]        [patch]
+
+$ KUBECONFIG=agent.kubeconfig kubectl auth can-i delete pods -n mlops-agent
+no
+
+$ KUBECONFIG=agent.kubeconfig kubectl auth can-i get pods -n kube-system
+no

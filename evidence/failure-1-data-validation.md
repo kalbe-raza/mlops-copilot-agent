@@ -489,3 +489,140 @@ None.
 
 ---
 
+## Resolution
+
+```console
+$ make resolve-data-failure
+M       data/raw/dataset.csv
+Data and pipelines are up to date.
+```
+
+## Verification (agent)
+
+## Has the tracked data changed? If it is clean, trigger the training pipeline again and report the result.
+
+*Request `55abd8f9625f` - planner `gemini:gemini-3-flash-preview` - 2026-11-13T17:55:31+00:00*
+
+**Answer**
+The DVC-tracked data is clean with no uncommitted changes, and the training pipeline `ml_training_pipeline` was successfully triggered and completed.
+
+**Evidence**
+*   DVC workspace check confirmed that all tracked data matches the committed versions (`workspace_changed: false`) [dvc_check_data_changes].
+*   Airflow DAG `ml_training_pipeline` (run `manual__2026-11-13T17:54:57.948146+00:00`) finished with state `success` [airflow_trigger_dag].
+*   All pipeline tasks, including `validate_data`, `train_model`, `quality_gate`, and `register_model`, completed successfully [airflow_trigger_dag].
+
+**Uncertainties**
+*   None.
+
+**Recommended actions**
+*   Review the newly registered model version in the MLflow Model Registry to evaluate its performance metrics compared to the current production model.
+
+| # | tool | status | duration (ms) | error |
+|---|---|---|---|---|
+| 1 | `dvc_check_data_changes` | success | 1122 |  |
+| 2 | `airflow_trigger_dag` | success | 30285 |  |
+
+<details><summary>Raw tool outputs</summary>
+
+```json
+[
+  {
+    "call_id": "8c0ef85a43",
+    "request_id": "55abd8f9625f",
+    "tool": "dvc_check_data_changes",
+    "status": "success",
+    "duration_ms": 1121.5,
+    "data": {
+      "workspace_changed": false,
+      "dvc_status": {},
+      "changes": [],
+      "uncommitted_dvc_metadata": [],
+      "interpretation": "All DVC-tracked data matches the committed versions."
+    },
+    "error": null
+  },
+  {
+    "call_id": "2f9e69bbee",
+    "request_id": "55abd8f9625f",
+    "tool": "airflow_trigger_dag",
+    "status": "success",
+    "duration_ms": 30285.43,
+    "data": {
+      "dag_id": "ml_training_pipeline",
+      "dag_run_id": "manual__2026-11-13T17:54:57.948146+00:00",
+      "unpaused_dag": false,
+      "conf": {},
+      "initial_state": "queued",
+      "final_state": "success",
+      "completed": true,
+      "task_instances": [
+        {
+          "task_id": "validate_data",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:54:58.822942Z",
+          "end_date": "2026-11-13T17:55:00.918896Z",
+          "duration_s": 2.1,
+          "operator": "_PythonDecoratedOperator"
+        },
+        {
+          "task_id": "preprocess_data",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:55:01.784785Z",
+          "end_date": "2026-11-13T17:55:03.979530Z",
+          "duration_s": 2.19,
+          "operator": "_PythonDecoratedOperator"
+        },
+        {
+          "task_id": "train_model",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:55:04.379770Z",
+          "end_date": "2026-11-13T17:55:07.063840Z",
+          "duration_s": 2.68,
+          "operator": "_PythonDecoratedOperator"
+        },
+        {
+          "task_id": "evaluate_and_log",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:55:07.851868Z",
+          "end_date": "2026-11-13T17:55:15.253543Z",
+          "duration_s": 7.4,
+          "operator": "_PythonDecoratedOperator"
+        },
+        {
+          "task_id": "quality_gate",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:55:15.903000Z",
+          "end_date": "2026-11-13T17:55:19.311731Z",
+          "duration_s": 3.41,
+          "operator": "_PythonDecoratedOperator"
+        },
+        {
+          "task_id": "register_model",
+          "state": "success",
+          "try_number": 1,
+          "max_tries": 2,
+          "start_date": "2026-11-13T17:55:19.417060Z",
+          "end_date": "2026-11-13T17:55:23.145669Z",
+          "duration_s": 3.73,
+          "operator": "_PythonDecoratedOperator"
+        }
+      ]
+    },
+    "error": null
+  }
+]
+```
+</details>
+
+---
+
