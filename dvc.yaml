@@ -1,0 +1,37 @@
+# Reproducible training pipeline: `dvc repro` re-runs only the stages whose inputs changed.
+# The same stages are orchestrated (with retries, quality gate and promotion) by Airflow
+# in dags/training_pipeline.py.
+stages:
+  validate:
+    cmd: python -m training.train validate --workdir pipeline_outputs --data data/raw/dataset.csv
+    deps:
+      - data/raw/dataset.csv
+      - training/schema.py
+    outs:
+      - pipeline_outputs/validation.json:
+          cache: false
+  preprocess:
+    cmd: python -m training.train preprocess --workdir pipeline_outputs
+    deps:
+      - pipeline_outputs/validation.json
+    outs:
+      - pipeline_outputs/train.csv
+      - pipeline_outputs/test.csv
+  train:
+    cmd: python -m training.train train --workdir pipeline_outputs --params-file params.yaml
+    deps:
+      - pipeline_outputs/train.csv
+      - training/train.py
+    params:
+      - train.model_type
+      - train.params
+    outs:
+      - pipeline_outputs/model.joblib
+  evaluate:
+    cmd: python -m training.train evaluate --workdir pipeline_outputs --experiment cancer-dvc-pipeline --run-name dvc-repro
+    deps:
+      - pipeline_outputs/model.joblib
+      - pipeline_outputs/test.csv
+    metrics:
+      - pipeline_outputs/metrics.json:
+          cache: false

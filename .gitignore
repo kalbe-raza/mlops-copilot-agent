@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.venv-airflow/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+*.egg-info/
+
+# Secrets / local config (never commit)
+.env
+*.kubeconfig
+kubeconfig-*.yaml
+
+# Local service state
+airflow_home/
+mlflow.db
+mlartifacts/
+mlruns/
+logs/
+artifacts/
+models/
+pipeline_outputs/state.json
+.dvc-storage/
