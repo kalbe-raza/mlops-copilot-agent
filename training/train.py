@@ -250,8 +250,10 @@ def evaluate(workdir: Path, experiment: str, run_name: str | None, extra_tags: d
         mlflow.log_dict(metrics, "evaluation/metrics.json")
         mlflow.log_artifact(str(workdir / "validation.json"), artifact_path="data_validation")
         signature = infer_signature(x_test, model.predict(x_test))
-        info = mlflow.sklearn.log_model(model, name="model", signature=signature,
-                                        input_example=x_test.head(3))
+        # skops serialisation: tree node storage must be explicitly trusted (we produced this model ourselves)
+        info = mlflow.sklearn.log_model(model, name="model", signature=signature, input_example=x_test.head(3),
+                                        skops_trusted_types=["sklearn.tree._tree.Tree"])
+        mlflow.log_artifact(str(workdir / "model.joblib"), artifact_path="serving")
         run_id = run.info.run_id
         experiment_id = run.info.experiment_id
 
