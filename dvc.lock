@@ -1,0 +1,75 @@
+schema: '2.0'
+stages:
+  validate:
+    cmd: python -m training.train validate --workdir pipeline_outputs --data 
+      data/raw/dataset.csv
+    deps:
+    - path: data/raw/dataset.csv
+      hash: md5
+      md5: 44042793903d981829eb545e67d08fee
+      size: 124806
+    - path: training/schema.py
+      hash: md5
+      md5: 8946b009fe59051d09fdcd967ea1f0ab
+      size: 1153
+    outs:
+    - path: pipeline_outputs/validation.json
+      hash: md5
+      md5: 2a14c1eee5db6b0af810030e5a61aa03
+      size: 158
+  preprocess:
+    cmd: python -m training.train preprocess --workdir pipeline_outputs
+    deps:
+    - path: pipeline_outputs/validation.json
+      hash: md5
+      md5: 2a14c1eee5db6b0af810030e5a61aa03
+      size: 158
+    outs:
+    - path: pipeline_outputs/test.csv
+      hash: md5
+      md5: 631f87980df7ff2ee7001c5f70f2d602
+      size: 31749
+    - path: pipeline_outputs/train.csv
+      hash: md5
+      md5: 4065e5b151f44e57dfd1265c11506ac3
+      size: 93563
+  train:
+    cmd: python -m training.train train --workdir pipeline_outputs --params-file
+      params.yaml
+    deps:
+    - path: pipeline_outputs/train.csv
+      hash: md5
+      md5: 4065e5b151f44e57dfd1265c11506ac3
+      size: 93563
+    - path: training/train.py
+      hash: md5
+      md5: cccfdde5f98f6d1cf1698722e60e5f66
+      size: 19443
+    params:
+      params.yaml:
+        train.model_type: random_forest
+        train.params:
+          n_estimators: 300
+          max_depth: 8
+    outs:
+    - path: pipeline_outputs/model.joblib
+      hash: md5
+      md5: 9c173140bf1bb910a5aaf6d5e56dda2e
+      size: 950450
+  evaluate:
+    cmd: python -m training.train evaluate --workdir pipeline_outputs 
+      --experiment cancer-dvc-pipeline --run-name dvc-repro
+    deps:
+    - path: pipeline_outputs/model.joblib
+      hash: md5
+      md5: 9c173140bf1bb910a5aaf6d5e56dda2e
+      size: 950450
+    - path: pipeline_outputs/test.csv
+      hash: md5
+      md5: 631f87980df7ff2ee7001c5f70f2d602
+      size: 31749
+    outs:
+    - path: pipeline_outputs/metrics.json
+      hash: md5
+      md5: 260556333d92bcdc8c63abaf92aa44d7
+      size: 200

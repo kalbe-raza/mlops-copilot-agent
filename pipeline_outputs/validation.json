@@ -1,0 +1,8 @@
+{
+  "dataset_path": "data/raw/dataset.csv",
+  "rows": 569,
+  "columns": 32,
+  "positive_fraction": 0.37258347978910367,
+  "errors": [],
+  "status": "passed"
+}
