@@ -55,7 +55,7 @@ down:  ## Stop MLflow, Airflow and the kind node container (state is preserved)
 cluster-down:  ## Delete the kind cluster entirely
 	kind delete cluster --name $(CLUSTER)
 
-seed:  ## Run the v2 experiment suite on the checked-out dataset (adds runs to MLflow)
+seed:  ## Run the six-model experiment suite on the checked-out dataset (registers best passing run)
 	$(PY) scripts/seed_experiments.py --experiment cancer-tuning-v2 --suite v2
 
 lint:  ## Ruff lint

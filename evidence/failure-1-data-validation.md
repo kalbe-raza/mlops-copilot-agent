@@ -1,5 +1,14 @@
 # Failure investigation 1 - corrupted training data (data/workflow layer)
 
+| | |
+|---|---|
+| **Injected fault** | `data/raw/dataset.csv` overwritten with a corrupted file: column `worst_concave_points` dropped and 40 `NaN` values in `mean_radius` (`make inject-data-failure`). The `.dvc` file was not changed. |
+| **Symptom** | Airflow run `manual__2026-11-13T17:52:56` failed. `validate_data` failed on try 1 and did not retry (deterministic failure, exit 2 -> `AirflowFailException`). The five downstream tasks (`preprocess_data`, `train_model`, `evaluate_and_log`, `quality_gate`, `register_model`) were `upstream_failed`, so no MLflow run was logged and nothing was promoted. |
+| **How the agent diagnosed it** | `airflow_get_failed_tasks` found the root-cause task and pulled the error lines from its log (`missing columns: ['worst_concave_points']`, `null values found: {'mean_radius': 40}`). `dvc_check_data_changes` showed `data/raw/dataset.csv` *modified* against the committed version (`dvc status`), which tied the failure to an unversioned data change rather than code or infrastructure. |
+| **Root cause** | Uncommitted, invalid modification of the DVC-tracked training data. |
+| **Resolution** | `dvc checkout --force data/raw/dataset.csv` restored data-v2.0 (md5 `44042793...`). The agent re-checked `dvc status` (clean) and, on request, re-triggered the DAG: run `manual__2026-11-13T17:54:57` succeeded, all six tasks green. |
+| **Prevention** | Validation runs first and fails fast; the quality gate also requires `dataset.matches_dvc == true`, so training on untracked data can never be promoted. |
+
 ## Injection
 
 ```console
@@ -12,7 +21,7 @@ data/raw/dataset.csv.dvc:
 
 ## Agent transcript
 
-## Trigger the training pipeline and report whether it succeeded.
+### User: Trigger the training pipeline and report whether it succeeded.
 
 *Request `836ef5f2f03d` - planner `gemini:gemini-3-flash-preview` - 2026-11-13T17:53:14+00:00*
 
@@ -272,7 +281,7 @@ The training pipeline `ml_training_pipeline` was triggered but failed during the
 
 ---
 
-## Why did the latest training pipeline run fail? Find the root cause.
+### User: Why did the latest training pipeline run fail? Find the root cause.
 
 *Request `95281dc1f86a` - planner `gemini:gemini-3-flash-preview` - 2026-11-13T17:53:32+00:00*
 
@@ -499,7 +508,7 @@ Data and pipelines are up to date.
 
 ## Verification (agent)
 
-## Has the tracked data changed? If it is clean, trigger the training pipeline again and report the result.
+### User: Has the tracked data changed? If it is clean, trigger the training pipeline again and report the result.
 
 *Request `55abd8f9625f` - planner `gemini:gemini-3-flash-preview` - 2026-11-13T17:55:31+00:00*
 
