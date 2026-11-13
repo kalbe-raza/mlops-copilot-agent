@@ -24,3 +24,4 @@ artifacts/
 models/
 pipeline_outputs/state.json
 .dvc-storage/
+agent.kubeconfig

@@ -1,0 +1,16 @@
+# Non-sensitive runtime configuration for the inference API (no secrets belong here).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inference-api-config
+  namespace: mlops-agent
+  labels:
+    app.kubernetes.io/name: inference-api
+    app.kubernetes.io/part-of: mlops-copilot
+data:
+  APP_VERSION: "1.0.0"
+  APP_ENV: "kind-local"
+  LOG_LEVEL: "INFO"
+  PREDICTION_THRESHOLD: "0.5"
+  MODEL_PATH: "/app/models/model.joblib"
+  MODEL_METADATA_PATH: "/app/models/model_metadata.json"

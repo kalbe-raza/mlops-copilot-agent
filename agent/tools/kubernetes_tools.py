@@ -258,8 +258,10 @@ class KubernetesTools:
         live: dict[str, Any] | str
         try:
             raw = self._call(self.core.connect_get_namespaced_service_proxy_with_path,
-                             f"{self.settings.k8s_service}:http", ns, "version")
-            live = json.loads(raw) if isinstance(raw, str) else raw
+                             f"{self.settings.k8s_service}:http", ns, "version", _preload_content=False)
+            body = raw.data if hasattr(raw, "data") else raw  # raw bytes: the client would repr() JSON otherwise
+            live = json.loads(body.decode() if isinstance(body, bytes) else body) if isinstance(body, (str, bytes)) \
+                else body
         except (ToolError, ValueError) as exc:
             live = f"live /version endpoint not reachable through the API server proxy: {exc}"
         return {

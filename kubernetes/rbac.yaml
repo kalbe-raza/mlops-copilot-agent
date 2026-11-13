@@ -1,0 +1,49 @@
+# Least-privilege identity for the MLOps agent: namespace-scoped, read access to diagnostics,
+# and only the verbs required for the confirmed restart/scale operations on Deployments.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mlops-agent
+  namespace: mlops-agent
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlops-agent-operator
+  namespace: mlops-agent
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "events", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["inference-api:http"]
+    verbs: ["get"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["inference-api"]
+    verbs: ["patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: ["inference-api"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlops-agent-operator
+  namespace: mlops-agent
+subjects:
+  - kind: ServiceAccount
+    name: mlops-agent
+    namespace: mlops-agent
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mlops-agent-operator

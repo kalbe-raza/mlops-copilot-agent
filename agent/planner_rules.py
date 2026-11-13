@@ -558,7 +558,8 @@ class RuleBasedPlanner:
                     unc.append(_fail_line(logs))
         if events.ok and not causes:
             for e in events.data["events"][:4]:
-                ev.append(f"Event {e['reason']} on {e['object']}: {e['message'][:200]} [k8s_get_events]")
+                ev.append(f"Earlier warning {e['reason']} on {e['object']} (last seen {e['last_seen']}): "
+                          f"{e['message'][:200]} [k8s_get_events]")
         if unhealthy.ok and unhealthy.data["all_healthy"] and serving:
             return _answer("No fault found: all application pods are Running and Ready and the Service has ready "
                            "endpoints.", ev, unc)

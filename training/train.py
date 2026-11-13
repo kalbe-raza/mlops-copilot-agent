@@ -54,6 +54,7 @@ LOG = logging.getLogger("training")
 DEFAULT_MODEL_NAME = "cancer-risk-classifier"
 DEFAULT_EXPERIMENT = "cancer-airflow-pipeline"
 RANDOM_STATE = 42
+EXIT_DETERMINISTIC_FAILURE = 2  # any other non-zero exit is treated as transient and retried by Airflow
 
 # Quality-gate thresholds (overridable through environment variables).
 GATE_MIN_F1 = float(os.getenv("GATE_MIN_F1", "0.93"))
@@ -403,8 +404,9 @@ def main(argv: list[str] | None = None) -> int:
             if not args.no_register:
                 register(workdir, args.model_name)
     except StageError as exc:
+        # Exit code 2 = deterministic failure (bad data, failed gate): orchestrators must not retry.
         LOG.error("stage '%s' failed: %s", args.stage, exc)
-        return 1
+        return EXIT_DETERMINISTIC_FAILURE
     return 0
 
 

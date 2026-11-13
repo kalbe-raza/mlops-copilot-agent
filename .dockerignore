@@ -1,0 +1,6 @@
+*
+!api/__init__.py
+!api/main.py
+!api/requirements.txt
+!models/model.joblib
+!models/model_metadata.json

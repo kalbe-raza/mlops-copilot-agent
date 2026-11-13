@@ -1,0 +1,7 @@
+# Dedicated, approved namespace for the inference application. The agent may only operate here.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlops-agent
+  labels:
+    app.kubernetes.io/part-of: mlops-copilot

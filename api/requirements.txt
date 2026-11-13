@@ -1,0 +1,11 @@
+# Runtime dependencies of the inference image (pinned to the training environment so the
+# serialized scikit-learn pipeline loads with identical library versions).
+fastapi==0.162.6
+uvicorn==0.54.0
+pydantic==2.14.3
+scikit-learn==1.9.1
+scipy==1.18.1
+numpy==2.5.4
+pandas==2.3.3
+joblib==1.6.0
+threadpoolctl==3.8.0

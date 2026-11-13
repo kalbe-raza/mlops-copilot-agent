@@ -10,6 +10,7 @@ disabled so every call passes through our validation, confirmation, timeout and 
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 from agent.schemas import ToolResult
@@ -40,12 +41,27 @@ Hard rules
    status and the logs of failing pods before concluding.
 8. Pipeline diagnosis: use airflow_get_failed_tasks (and airflow_get_task_logs when needed).
 
+Required tool sequences (call every listed tool; add others if useful)
+- Dataset used by a run / experiment / model: mlflow_get_run_dataset_provenance, then
+  dvc_resolve_dataset_reference with the recorded md5. Report the data version tag, DVC md5,
+  dataset Git commit and how to reproduce it.
+- Best model + dataset + deployment + retraining question: mlflow_find_best_run,
+  mlflow_get_run_dataset_provenance (best run), dvc_resolve_dataset_reference, k8s_get_deployed_version,
+  k8s_find_unhealthy_pods, airflow_get_dag_runs, assess_retraining_need. Do NOT trigger anything.
+- "Why is the API unavailable / unhealthy": k8s_find_unhealthy_pods, k8s_list_services,
+  k8s_list_deployments, k8s_get_events, then k8s_get_pod_logs for an unhealthy pod.
+- Pipeline failure: airflow_get_failed_tasks; if validate_data failed also dvc_check_data_changes.
+- Compare runs / recommend a candidate: mlflow_compare_runs.
+
 Answer in concise Markdown with these sections:
 **Answer** - direct answer in 1-3 sentences.
 **Evidence** - bullet points of facts, each ending with the source tool in brackets.
 **Uncertainties** - what could not be verified (write "None" if nothing).
 **Recommended actions** - only when useful.
 """
+
+
+TRANSIENT_CODES = {429, 500, 503, 504}
 
 
 class LLMError(RuntimeError):
@@ -56,7 +72,7 @@ class GeminiPlanner:
     name = "gemini"
 
     def __init__(self, api_key: str | None, model: str, registry: ToolRegistry, max_steps: int = 12,
-                 client: Any = None) -> None:
+                 client: Any = None, max_retries: int = 2, retry_backoff: float = 3.0) -> None:
         if not api_key and client is None:
             raise LLMError("no Gemini API key configured (GEMINI_API_KEY / gemini_api_key)")
         self.model = model
@@ -65,13 +81,18 @@ class GeminiPlanner:
         self._client = client
         self._api_key = api_key
         self.history: list[Any] = []
+        self.max_retries = max_retries
+        self.retry_backoff = retry_backoff
 
     @property
     def client(self) -> Any:
         if self._client is None:
             from google import genai
+            from google.genai import types
 
-            self._client = genai.Client(api_key=self._api_key)
+            # Function calling is served by the v1beta surface; bound every request with a timeout.
+            self._client = genai.Client(api_key=self._api_key,
+                                        http_options=types.HttpOptions(api_version="v1beta", timeout=90_000))
         return self._client
 
     def _config(self) -> Any:
@@ -88,6 +109,21 @@ class GeminiPlanner:
             temperature=0.0,
         )
 
+    def _generate(self, contents: list[Any], config: Any) -> Any:
+        """Call Gemini, retrying transient overload/rate-limit errors with exponential back-off."""
+        last: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                return self.client.models.generate_content(model=self.model, contents=contents, config=config)
+            except Exception as exc:  # noqa: BLE001 - classify below, surface as LLMError for graceful fallback
+                last = exc
+                code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+                if code in TRANSIENT_CODES and attempt < self.max_retries:
+                    time.sleep(self.retry_backoff * (2 ** attempt))
+                    continue
+                break
+        raise LLMError(f"Gemini request failed: {type(last).__name__}: {str(last)[:300]}") from last
+
     def reset(self) -> None:
         self.history = []
 
@@ -99,10 +135,7 @@ class GeminiPlanner:
         contents = [*self.history, user_turn]
         results: list[ToolResult] = []
         for _ in range(self.max_steps):
-            try:
-                response = self.client.models.generate_content(model=self.model, contents=contents, config=config)
-            except Exception as exc:  # noqa: BLE001 - surface as LLMError for graceful fallback
-                raise LLMError(f"Gemini request failed: {type(exc).__name__}: {str(exc)[:300]}") from exc
+            response = self._generate(contents, config)
             candidate = (response.candidates or [None])[0]
             if candidate is None or candidate.content is None:
                 raise LLMError("Gemini returned no candidate (possibly blocked or empty response)")
