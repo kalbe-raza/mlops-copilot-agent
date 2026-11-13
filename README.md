@@ -71,7 +71,7 @@ mlops-copilot-agent/
 ├── training/                   # pipeline stages (train.py), dataset schema, provenance capture
 ├── data/raw/dataset.csv.dvc    # DVC-tracked dataset (tags data-v1.0, data-v2.0)
 ├── kubernetes/                 # namespace, deployment, service, configmap, rbac, kind cluster config
-├── tests/                      # 78 pytest tests (75 unit + 3 DAG integrity; services mocked)
+├── tests/                      # 79 pytest tests (76 unit + 3 DAG integrity; services mocked)
 ├── scripts/                    # service start/stop, seeding, export, failure injection, evidence capture
 ├── evidence/                   # recorded conversations, failure investigations, exported CLI evidence
 ├── screenshots/                # MLflow / Airflow UI, DVC / Kubernetes / agent terminal evidence
@@ -178,7 +178,7 @@ and `logs/agent.jsonl` holds the structured log.
 
 ```bash
 make lint        # ruff
-make test        # 75 tests, no live services needed (test_dag.py is skipped here and runs below)
+make test        # 76 tests, no live services needed (test_dag.py is skipped here and runs below)
 make test-dag    # 3 DAG integrity tests inside the Airflow virtualenv
 ```
 
@@ -187,7 +187,7 @@ make test-dag    # 3 DAG integrity tests inside the Airflow virtualenv
 | Executor | success path, unknown tool, invalid arguments, timeouts, unavailable/error classification, confirmation, policy-before-prompt, secrets never logged |
 | Kubernetes | unapproved namespace and unmanaged deployment rejected **without an API call**, missing confirmation rejected, RBAC 403 -> denied, unreachable cluster -> unavailable, unhealthy pod detection |
 | Airflow | JWT bearer auth + refresh, unapproved DAG / disallowed conf denied, trigger-and-wait, failed-task diagnosis, unreachable API |
-| MLflow | best run + caveats, comparison excludes failed gate, provenance by run number, registry aliases, server down -> unavailable (temporary SQLite store) |
+| MLflow | best run + caveats, comparison excludes failed gate, experiment comparison, provenance by run number, registry aliases, server down -> unavailable (temporary SQLite store) |
 | DVC | versions/history, compare, change detection, md5 resolution, hash-verified `dvc get` reproduction, command allow-list (temporary Git+DVC repo) |
 | Agent | tool selection for 12 intents, all-four-technology scenario without triggering retraining, **no invented results when tools are unavailable**, LLM hallucination replaced, unverified numbers flagged, LLM fallback, no repeated side effects, Gemini loop |
 | Pipeline / API / manifests | corrupt data rejected, quality gate blocks promotion, end-to-end run with provenance, API health semantics, manifest requirements, least-privilege RBAC |

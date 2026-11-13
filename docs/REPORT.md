@@ -29,7 +29,7 @@ Four design rules apply throughout:
    answers when the LLM is unavailable and never repeats a state change the LLM already made.
 
 The system was exercised end to end: 5 recorded conversations, 2 injected failures that were diagnosed and
-resolved, and 78 automated tests that run in GitHub Actions on every pull request.
+resolved, and 79 automated tests that run in GitHub Actions on every pull request.
 
 ## 2. System architecture
 
@@ -248,12 +248,12 @@ LLM. Every tool returns a `ToolResult {call_id, request_id, tool, status, durati
 
 ## 6. Testing and CI
 
-There are 78 tests: 75 unit tests run with `pytest`, plus 3 DAG-integrity tests that run in the Airflow
+There are 79 tests: 76 unit tests run with `pytest`, plus 3 DAG-integrity tests that run in the Airflow
 environment. They pass locally, in a fresh clone and in GitHub Actions.
 
 | Requirement | Tests (file::name) |
 |---|---|
-| >= 8 meaningful tests | 78 tests in 9 files |
+| >= 8 meaningful tests | 79 tests in 9 files |
 | Mocked tool responses for unavailable services | `UnavailableModule` fixture; `test_unreachable_*` for MLflow, Airflow and Kubernetes |
 | Successful tool selection and execution | `test_rule_planner_selects_the_right_tools` (12 intents), `test_mandatory_scenario_correlates_all_four_technologies_without_retraining`, `test_gemini_planner_executes_tool_calls_through_the_executor` |
 | Timeouts, invalid requests, service failures | `test_tool_timeout_is_reported_not_raised`, `test_invalid_arguments_are_rejected_before_the_tool_runs`, `test_unknown_tool_is_rejected_as_invalid_request`, `test_service_failures_are_classified` |

@@ -85,3 +85,21 @@ def test_unreachable_tracking_server_is_unavailable(settings, logger):
     result = make_executor(tools.specs(), logger).execute("mlflow_list_experiments", {}, "r1")
     assert result.status == ToolStatus.UNAVAILABLE
     assert result.data is None
+
+
+def test_compare_experiments_aggregates_metric_per_experiment(settings, tracked):
+    from agent.schemas import CompareExperimentsInput
+
+    mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
+    mlflow.set_experiment("unit-exp-2")
+    with mlflow.start_run(run_name="run-04-svm"):
+        mlflow.log_metrics({"f1": 0.90})
+        mlflow.set_tags({"dataset.version": "data-v1.0"})
+    out = MLflowTools(settings).compare_experiments(
+        CompareExperimentsInput(experiment_names=["unit-exp", "unit-exp-2"], metric="f1"))
+    by_name = {e["experiment"]: e for e in out["experiments"]}
+    assert by_name["unit-exp"]["best_f1"] == 0.99 and by_name["unit-exp"]["runs"] == 3
+    assert by_name["unit-exp-2"]["best_f1"] == 0.9 and by_name["unit-exp-2"]["std_f1"] is None
+    assert out["highest_best"] == "unit-exp"
+    with pytest.raises(ToolError, match="not found"):
+        MLflowTools(settings).compare_experiments(CompareExperimentsInput(experiment_names=["unit-exp", "nope"]))
