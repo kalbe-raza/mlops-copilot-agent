@@ -1,4 +1,4 @@
-# Airflow 3 REST API evidence - 2026-11-13T17:59:36+00:00 (JWT from POST /auth/token)
+# Airflow 3 REST API evidence - 2026-11-13T18:19:12+00:00 (JWT from POST /auth/token)
 
 $ GET /api/v2/version
  {'version': '3.4.0', 'git_version': '.release:619a787ac81e8b7c8a9102fc78e3f0b00625d04e'}

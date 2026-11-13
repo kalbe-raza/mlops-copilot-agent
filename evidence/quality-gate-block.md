@@ -21,7 +21,7 @@
 | Wrong hyper-parameters for non-RF models | DAG `params` default was RF-specific | Per-model `DEFAULT_PARAMS` in `training/train.py`, DAG default `params={}` | `test_rule_planner_*`, re-run `manual__2026-11-13T17:52:13` succeeded |
 | LLM quota exhaustion | Small per-model free-tier quota | Model fallback chain (`GEMINI_FALLBACK_MODELS`) | `test_gemini_quota_exhaustion_switches_to_fallback_model` |
 
-## Trigger the model training pipeline with a gradient boosting model and report whether execution succeeded.
+### User: Trigger the model training pipeline with a gradient boosting model and report whether execution succeeded.
 
 *Request `34f1d74a970c` - planner `rules` - 2026-11-13T17:48:49+00:00*
 

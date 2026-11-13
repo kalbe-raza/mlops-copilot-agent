@@ -1,5 +1,14 @@
 # Failure investigation 2 - broken model path in the ConfigMap (infrastructure layer)
 
+| | |
+|---|---|
+| **Injected fault** | ConfigMap `inference-api-config` patched so `MODEL_PATH=/app/models/model_v2.joblib` (a file that is not in the image), then the pods were deleted, as in a node drain. The config change only takes effect when containers restart (`make inject-k8s-failure`). |
+| **Symptom** | Both replacement pods `Running` but `0/1` ready, the Service had **0 ready endpoints**, and the prediction API was unavailable. Liveness kept passing, so the pods were not restarted in a loop. |
+| **How the agent diagnosed it** | `k8s_find_unhealthy_pods` (not ready, plus warning events) -> `k8s_list_services` (0 ready endpoints) -> `k8s_list_deployments` (0/2 available) -> `k8s_get_events` (`Readiness probe failed: HTTP probe failed with statuscode: 503`) -> `k8s_get_pod_logs` (`FileNotFoundError: Model file not found: /app/models/model_v2.joblib`). A follow-up `k8s_get_deployed_version` showed the ConfigMap value `MODEL_PATH=/app/models/model_v2.joblib` as the source. |
+| **Root cause** | Wrong non-sensitive configuration (model path) in the ConfigMap. The readiness probe correctly kept the broken pods out of the Service. |
+| **Resolution** | Re-applied the version-controlled ConfigMap (`kubernetes/configmap.yaml`), then restarted through the agent. A restart outside the approved namespace was **rejected by policy before any prompt**, and a restart without confirmation was **rejected**. The confirmed restart (`--yes`) rolled out new pods: 2/2 ready, 2 endpoints, `/health/ready` = ready. |
+| **Prevention** | Readiness reports model-load failures separately from liveness. `maxUnavailable: 0` keeps old pods serving during a normal rollout. Config is applied from Git. |
+
 ## Injection
 
 ```console
@@ -19,7 +28,7 @@ inference-api-59f7cb7447-gkh9t   0/1     Running   0          45s
 
 ## Agent transcript
 
-## Why is my prediction API unavailable?
+### User: Why is my prediction API unavailable?
 
 *Request `27b3db307cc4` - planner `gemini:gemini-3-flash-preview` - 2026-11-13T17:56:47+00:00*
 
@@ -300,7 +309,7 @@ None.
 
 ---
 
-## Which configuration tells the inference pods to load /app/models/model_v2.joblib? Inspect the deployed version and its ConfigMap and identify the root cause.
+### User: Which configuration tells the inference pods to load /app/models/model_v2.joblib? Inspect the deployed version and its ConfigMap and identify the root cause.
 
 *Request `3dbee90745f3` - planner `gemini:gemini-3.5-flash-lite` - 2026-11-13T17:57:09+00:00*
 
@@ -619,7 +628,7 @@ The ConfigMap is only read at container start, so the pods must be restarted. Re
 
 ### 2. Safety control - attempt outside the approved namespace (rejected before any prompt)
 
-## Call k8s_restart_deployment for deployment coredns in namespace kube-system.
+### User: Call k8s_restart_deployment for deployment coredns in namespace kube-system.
 
 *Request `77f9527b07e8` - planner `gemini:gemini-3.5-flash-lite` - 2026-11-13T17:57:56+00:00*
 
@@ -654,7 +663,7 @@ The requested operation was not performed because it was blocked by a safety pol
 
 ### 3. Safety control - approved deployment, but no confirmation given (non-interactive, no `--yes`)
 
-## Restart the inference deployment
+### User: Restart the inference deployment
 
 *Request `f508b3b1e0d1` - planner `rules` - 2026-11-13T17:58:05+00:00*
 
@@ -689,7 +698,7 @@ The requested operation was not performed because it was blocked by a safety pol
 
 ### 4. Confirmed restart (`--yes` = explicit user confirmation)
 
-## Restart the inference deployment
+### User: Restart the inference deployment
 
 *Request `3565b82b152d` - planner `rules` - 2026-11-13T17:58:06+00:00*
 
@@ -742,7 +751,7 @@ NAME                                                 ADDRESSTYPE   PORTS   ENDPO
 endpointslice.discovery.k8s.io/inference-api-vck2s   IPv4          8000    10.244.0.9,10.244.0.10   28m
 ```
 
-## Is the prediction API healthy now? Diagnose its pods, service endpoints and recent events.
+### User: Is the prediction API healthy now? Diagnose its pods, service endpoints and recent events.
 
 *Request `c8cc690cec2c` - planner `gemini:gemini-3.5-flash-lite` - 2026-11-13T17:58:40+00:00*
 

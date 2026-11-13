@@ -1,4 +1,4 @@
-# DVC evidence - 2026-11-13T17:59:29Z
+# DVC evidence - 2026-11-13T18:19:05Z
 
 $ git tag -n --list data-v*
 data-v1.0       Dataset v1.0: initial 400-patient extract
@@ -64,8 +64,6 @@ $ dvc dag
 $ dvc metrics show
 Path                           accuracy    f1      f1_gap    precision    recall    roc_auc    train_f1
 pipeline_outputs/metrics.json  0.96503     0.9505  0.0495    1.0          0.90566   0.99539    1.0
-
-$ dvc params diff HEAD~3
 
 $ dvc get . data/raw/dataset.csv --rev data-v1.0 -o /tmp/dataset-v1.csv --force && md5sum /tmp/dataset-v1.csv && wc -l /tmp/dataset-v1.csv
 c0437af750ce5e7418d94a4689cebac6  /tmp/dataset-v1.csv

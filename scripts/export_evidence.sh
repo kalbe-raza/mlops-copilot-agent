@@ -17,7 +17,7 @@ run() { echo; echo "\$ $*"; eval "$@" 2>&1; }
   run dvc diff data-v1.0 data-v2.0
   run dvc dag
   run dvc metrics show
-  run dvc params diff HEAD~3
+
   run "dvc get . data/raw/dataset.csv --rev data-v1.0 -o /tmp/dataset-v1.csv --force && md5sum /tmp/dataset-v1.csv && wc -l /tmp/dataset-v1.csv"
   run "git show data-v1.0:data/raw/dataset.csv.dvc | grep md5"
 } > evidence/dvc.txt
