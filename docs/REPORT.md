@@ -253,7 +253,7 @@ environment. They pass locally, in a fresh clone and in GitHub Actions.
 
 | Requirement | Tests (file::name) |
 |---|---|
-| >= 8 meaningful tests | 79 tests in 9 files |
+| >= 8 meaningful tests | 79 tests in 10 files |
 | Mocked tool responses for unavailable services | `UnavailableModule` fixture; `test_unreachable_*` for MLflow, Airflow and Kubernetes |
 | Successful tool selection and execution | `test_rule_planner_selects_the_right_tools` (12 intents), `test_mandatory_scenario_correlates_all_four_technologies_without_retraining`, `test_gemini_planner_executes_tool_calls_through_the_executor` |
 | Timeouts, invalid requests, service failures | `test_tool_timeout_is_reported_not_raised`, `test_invalid_arguments_are_rejected_before_the_tool_runs`, `test_unknown_tool_is_rejected_as_invalid_request`, `test_service_failures_are_classified` |
